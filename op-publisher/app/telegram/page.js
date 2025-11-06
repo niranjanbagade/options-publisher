@@ -271,9 +271,6 @@ export default function TelegramPage() {
               value={buyPrice}
               onChange={(e) => setBuyPrice(e.target.value)}
             />
-            <p className="mt-2 text-sm text-gray-500">
-              Range preview: {getRangeText(buyPrice) ?? "—"}
-            </p>
           </div>
         )}
 
@@ -287,9 +284,6 @@ export default function TelegramPage() {
               value={sellPrice}
               onChange={(e) => setSellPrice(e.target.value)}
             />
-            <p className="mt-2 text-sm text-gray-500">
-              Range preview: {getRangeText(sellPrice) ?? "—"}
-            </p>
           </div>
         )}
 
