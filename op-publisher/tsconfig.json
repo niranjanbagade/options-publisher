@@ -18,8 +18,10 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/components/*": ["components/*"],
+      "@/*": ["*"] 
     }
   },
   "include": [
@@ -29,6 +31,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "app/pages/api/auth/[...nextauth]/route.js", "app/pages/api/auth/[...nextauth]/authOptions.js", "app/page.js", "app/layout.js"  ],
   "exclude": ["node_modules"]
 }
