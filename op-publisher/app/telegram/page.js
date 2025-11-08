@@ -75,24 +75,24 @@ export default function TelegramPage() {
 
     useEffect(() => {
         const resetHandler = () => {
-          setAction("BUY")
-          setStrike(24000)
-          setOptionType("CE")
-          setMarketDirection("BULLISH")
-          setBuyOptionType("CE")
-          setSellOptionType("PE")
-          setBuyPrice("")
-          setSellPrice("")
-          setBuyStopLoss("")
-          setSellStopLoss("")
-          setPreview("")
-          setConfirmMode(false)
+            setAction("BUY")
+            setStrike(24000)
+            setOptionType("CE")
+            setMarketDirection("BULLISH")
+            setBuyOptionType("CE")
+            setSellOptionType("PE")
+            setBuyPrice("")
+            setSellPrice("")
+            setBuyStopLoss("")
+            setSellStopLoss("")
+            setPreview("")
+            setConfirmMode(false)
         }
-      
+
         document.addEventListener("reset-forms", resetHandler)
         return () => document.removeEventListener("reset-forms", resetHandler)
-      }, [])
-      
+    }, [])
+
 
     // ---- Utilities ----
     const getRangeText = (val) => {
@@ -172,12 +172,12 @@ export default function TelegramPage() {
                 toast.success("Message sent!", { id: loading })
                 setConfirmMode(false)
                 setPreview("")
-              
+
                 // Notify child forms to reset if needed
                 document.dispatchEvent(new CustomEvent("reset-forms"))
-              } else {
+            } else {
                 toast.error(`Failed: ${data?.error ?? "unknown"}`, { id: loading })
-              }              
+            }
         } catch {
             toast.error("Unexpected error", { id: loading })
         }
@@ -199,6 +199,7 @@ export default function TelegramPage() {
                         { id: "trade", label: "Fresh Trade" },
                         { id: "squareoff", label: "Square Off" },
                         { id: "loss", label: "Loss Booking" },
+                        { id: "ignore", label: "Ignore Alert" },
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -366,6 +367,8 @@ export default function TelegramPage() {
 
                 {/* Loss Booking */}
                 {activeTab === "loss" && <LossBookingSection strikes={strikes} onSend={sendToTelegram} />}
+
+                {activeTab === "ignore" && <IgnoreAlertSection onSend={sendToTelegram} />}
             </div>
 
             {/* Global preview (used by Fresh Trade only) */}
@@ -427,20 +430,20 @@ function SquareOffSection({ onSend, strikes }) {
 
     useEffect(() => {
         const resetHandler = () => {
-          setSubType("partial")
-          setStrike(25400)
-          setSide("BOTH")
-          setCePrice("")
-          setPePrice("")
-          setCeSL("")
-          setPeSL("")
-          setPreview("")
+            setSubType("partial")
+            setStrike(25400)
+            setSide("BOTH")
+            setCePrice("")
+            setPePrice("")
+            setCeSL("")
+            setPeSL("")
+            setPreview("")
         }
-      
+
         document.addEventListener("reset-forms", resetHandler)
         return () => document.removeEventListener("reset-forms", resetHandler)
-      }, [])
-      
+    }, [])
+
 
     const buildMessage = () => {
         const parts = []
@@ -628,17 +631,17 @@ function LossBookingSection({ onSend, strikes }) {
 
     useEffect(() => {
         const resetHandler = () => {
-          setStrike(25600)
-          setSide("BOTH")
-          setCePrice("")
-          setPePrice("")
-          setPreview("")
+            setStrike(25600)
+            setSide("BOTH")
+            setCePrice("")
+            setPePrice("")
+            setPreview("")
         }
-      
+
         document.addEventListener("reset-forms", resetHandler)
         return () => document.removeEventListener("reset-forms", resetHandler)
-      }, [])
-      
+    }, [])
+
 
     const buildMessage = () => {
         if (side === "CE" && !cePrice) return toast.error("Enter CE price")
@@ -724,3 +727,35 @@ function LossBookingSection({ onSend, strikes }) {
         </form>
     )
 }
+
+// ---- Ignore Alert Section ----
+function IgnoreAlertSection({ onSend }) {
+    const [loading, setLoading] = useState(false)
+
+    const handleSend = async () => {
+        if (loading) return
+        setLoading(true)
+        try {
+            await onSend("Kindly ignore the alert")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="bg-white rounded-2xl shadow p-8">
+            <h1 className="text-2xl font-bold mb-6">Ignore Alert</h1>
+            <p className="text-gray-600 mb-6">
+                Click the button below to send a message to the Telegram channel.
+            </p>
+            <button
+                onClick={handleSend}
+                disabled={loading}
+                className={`w-full py-3 rounded text-white ${loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+            >
+                {loading ? "Sending..." : "Send 'Kindly ignore the alert'"}
+            </button>
+        </div>
+    )
+}  
