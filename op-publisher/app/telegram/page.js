@@ -4,87 +4,110 @@ import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
 
-export default function TelegramPage() {
-  const { data: session, status } = useSession()
-  const [authorized, setAuthorized] = useState(false)
+/**
+ * Stable TelegramPage component:
+ * - All Hooks are declared up top (no conditional hooks)
+ * - BOTH mode offers Market Direction (Bullish / Bearish) which maps to option types
+ * - Preview, confirm, send, and full reset after send
+ */
 
-  // Form states
+export default function TelegramPage() {
+  // ------ Hooks: ALWAYS declared (top-level) ------
+  const { data: session, status } = useSession()
+
+  // auth / UI
+  const [authorized, setAuthorized] = useState(false)
+  const [confirmMode, setConfirmMode] = useState(false)
+  const [preview, setPreview] = useState("")
+
+  // form state
   const [action, setAction] = useState("BUY") // BUY | SELL | BOTH
   const [strike, setStrike] = useState(24000)
-  const [optionType, setOptionType] = useState("CE") // for single buy/sell
-  const [buyOptionType, setBuyOptionType] = useState("PE") // for BOTH: buy
-  const [sellOptionType, setSellOptionType] = useState("CE") // for BOTH: sell
-  const [expiry, setExpiry] = useState("")
-  const [buyPrice, setBuyPrice] = useState("")
-  const [sellPrice, setSellPrice] = useState("")
-  const [preview, setPreview] = useState("")
-  const [confirmMode, setConfirmMode] = useState(false)
+  const [optionType, setOptionType] = useState("CE") // used for single BUY or SELL
+  const [marketDirection, setMarketDirection] = useState("BULLISH") // used only when BOTH
+  const [buyOptionType, setBuyOptionType] = useState("CE") // auto-set for BOTH (buy leg)
+  const [sellOptionType, setSellOptionType] = useState("PE") // auto-set for BOTH (sell leg)
+  const [buyPrice, setBuyPrice] = useState("") // base price user enters for buy
+  const [sellPrice, setSellPrice] = useState("") // base price user enters for sell
 
-  // Compute next Tuesday (weekly expiry)
+  const [expiry, setExpiry] = useState("") // next weekly expiry string
+
+  // ------ Derived data (no hooks) ------
+  const strikes = Array.from({ length: (50000 - 24000) / 50 + 1 }, (_, i) => 24000 + i * 50)
+
+  // ------ Effects (always declared, but internal logic conditional) ------
+  // compute next Tuesday expiry (runs once)
   useEffect(() => {
     const today = new Date()
     const nextTuesday = new Date(today)
     const day = today.getDay() // 0=Sun ... 2=Tue
     const daysUntilTue = (2 - day + 7) % 7 || 7
     nextTuesday.setDate(today.getDate() + daysUntilTue)
-    const formatted = nextTuesday.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-    })
+    const formatted = nextTuesday.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
     setExpiry(formatted.replace(".", "")) // e.g. "11 Nov"
   }, [])
 
-  // Whitelist check (frontend convenience — backend still enforces)
+  // whitelist check for frontend convenience (backend still must enforce)
   useEffect(() => {
-    if (session?.user?.email) {
-      const whitelist = (process.env.NEXT_PUBLIC_AUTHORIZED_USERS || "")
-        .split(",")
-        .map((e) => e.trim())
-      setAuthorized(whitelist.includes(session.user.email))
+    if (!session?.user?.email) {
+      setAuthorized(false)
+      return
     }
+    const whitelist = (process.env.NEXT_PUBLIC_AUTHORIZED_USERS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    setAuthorized(whitelist.includes(session.user.email))
   }, [session])
 
-  if (status === "loading") return <p>Loading...</p>
-  if (!session) return <p>Please sign in first.</p>
-  if (!authorized) return <p>Access denied.</p>
+  // map marketDirection -> option types whenever action === "BOTH" OR marketDirection changes
+  useEffect(() => {
+    if (action === "BOTH") {
+      if (marketDirection === "BULLISH") {
+        // Sell PE & Buy CE
+        setBuyOptionType("CE")
+        setSellOptionType("PE")
+      } else {
+        // BEARISH -> Buy PE & Sell CE
+        setBuyOptionType("PE")
+        setSellOptionType("CE")
+      }
+    }
+    // Note: we intentionally do not change buy/sell prices here (preserve user input)
+  }, [action, marketDirection])
 
-  // Generate strike options (24000 -> 50000 step 50)
-  const strikes = Array.from(
-    { length: (50000 - 24000) / 50 + 1 },
-    (_, i) => 24000 + i * 50
-  )
-
-  // Utility: compute range text and validate numeric input
+  // ------ Utilities ------
   const getRangeText = (val) => {
     const low = Number(val)
-    if (Number.isNaN(low)) return null
-    const high = +((low + 5).toFixed(2)).replace(/\.00$/, "") // keep integer if integer
-    return `${low} - ${high}`
+    if (!isFinite(low)) return null
+    const high = low + 5
+    // format to avoid trailing .0
+    const format = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2))
+    return `${format(low)} - ${format(high)}`
   }
 
-  // Build preview message based on action and chosen option types
   const buildPreviewMessage = () => {
+    // single BUY
     if (action === "BUY") {
       const range = getRangeText(buyPrice)
       if (!range) {
         toast.error("Enter a valid buy base price")
         return null
       }
-      const opt = optionType
-      return `FRESH TRADE\n\n"BUY" ${expiry} "Nifty ${strike} ${opt}" between ${range}`
+      return `FRESH TRADE\n\n"BUY" ${expiry} "Nifty ${strike} ${optionType}" between ${range}`
     }
 
+    // single SELL
     if (action === "SELL") {
       const range = getRangeText(sellPrice)
       if (!range) {
         toast.error("Enter a valid sell base price")
         return null
       }
-      const opt = optionType
-      return `FRESH TRADE\n\n"SELL" ${expiry} "Nifty ${strike} ${opt}" between ${range}`
+      return `FRESH TRADE\n\n"SELL" ${expiry} "Nifty ${strike} ${optionType}" between ${range}`
     }
 
-    // BOTH
+    // BOTH (directional)
     const buyRange = getRangeText(buyPrice)
     const sellRange = getRangeText(sellPrice)
     if (!buyRange || !sellRange) {
@@ -92,7 +115,7 @@ export default function TelegramPage() {
       return null
     }
 
-    // Use buyOptionType & sellOptionType
+    // Compose using the mapped buyOptionType / sellOptionType
     return (
       `FRESH TRADE\n\n` +
       `"BUY" ${expiry} "Nifty ${strike} ${buyOptionType}" between ${buyRange}\n` +
@@ -101,21 +124,15 @@ export default function TelegramPage() {
     )
   }
 
-  // Handle preview (form submit)
+  // ------ Handlers ------
   const handlePreview = (e) => {
     e.preventDefault()
-
-    var message = buildPreviewMessage()
+    const message = buildPreviewMessage()
     if (!message) return
-    if (action == "BOTH" && buyOptionType == sellOptionType)
-        message = "ERROR: NOT A DIRECTIONAL TRADE"
-    if (action == "BOTH" && (buyPrice == 0 || sellPrice == 0))
-        message = "ERROR: PLEASE ENTER THE RANGE"
     setPreview(message)
     setConfirmMode(true)
   }
 
-  // Send message to Telegram
   const sendToTelegram = async () => {
     const loading = toast.loading("Sending message...")
     try {
@@ -128,222 +145,205 @@ export default function TelegramPage() {
 
       if (res.ok) {
         toast.success("Message sent successfully!", { id: loading })
-        // Reset entire form to defaults
+        // reset all form state to defaults
         setAction("BUY")
         setStrike(24000)
         setOptionType("CE")
-        setBuyOptionType("PE")
-        setSellOptionType("CE")
+        setMarketDirection("BULLISH")
+        setBuyOptionType("CE")
+        setSellOptionType("PE")
         setBuyPrice("")
         setSellPrice("")
         setPreview("")
         setConfirmMode(false)
       } else {
-        toast.error(`Failed: ${data.error}`, { id: loading })
+        toast.error(`Failed: ${data?.error ?? "unknown"}`, { id: loading })
       }
     } catch (err) {
       toast.error("Unexpected error!", { id: loading })
     }
   }
 
+  // ------ Render: hooks called above, conditional UI only below ------
+  if (status === "loading") return <p className="p-4">Loading...</p>
+  if (!session) return <p className="p-4">Please sign in first.</p>
+  if (!authorized) return <p className="p-4">Access denied.</p>
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4 py-8">
-      <form
-        onSubmit={handlePreview}
-        className="bg-white shadow-xl rounded-2xl px-8 pt-8 pb-10 w-full max-w-md"
-      >
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          NIFTY Option Signal
-        </h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="w-full max-w-2xl space-y-6">
+        <form onSubmit={handlePreview} className="bg-white rounded-2xl shadow p-8">
+          <h1 className="text-2xl font-bold mb-6">NIFTY Option Signal</h1>
 
-        {/* Trade Type */}
-        <label className="block mb-2 font-semibold text-gray-700">Trade Type</label>
-        <div className="flex justify-between mb-6">
-          {["BUY", "SELL", "BOTH"].map((opt) => (
-            <label key={opt} className="flex items-center gap-2 text-gray-700">
-              <input
-                type="radio"
-                name="action"
-                value={opt}
-                checked={action === opt}
-                onChange={() => setAction(opt)}
-                className="accent-blue-600"
-              />
-              {opt === "BOTH" ? "Both (Buy & Sell)" : `Only ${opt.charAt(0)}${opt.slice(1).toLowerCase()}`}
-            </label>
-          ))}
-        </div>
-
-        {/* Expiry */}
-        <div className="mb-6 text-sm">
-          <span className="font-semibold text-gray-700">Next Weekly Expiry: </span>
-          <span className="text-blue-700 font-semibold">{expiry}</span>
-        </div>
-
-        {/* Strike */}
-        <label className="block mb-2 font-semibold text-gray-700">Strike Price</label>
-        <select
-          className="border rounded-lg w-full py-2 px-3 mb-6 focus:ring-2 focus:ring-blue-500"
-          value={strike}
-          onChange={(e) => setStrike(Number(e.target.value))}
-        >
-          {strikes.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-
-        {/* For single BUY or SELL: single option type selector */}
-        {action !== "BOTH" && (
-          <>
-            <label className="block mb-2 font-semibold text-gray-700">Option Type</label>
-            <div className="flex gap-8 mb-6">
-              {["CE", "PE"].map((t) => (
-                <label key={t} className="flex items-center gap-2 text-gray-700">
+          {/* Trade Type */}
+          <div className="mb-4">
+            <label className="block font-semibold mb-2">Trade Type</label>
+            <div className="flex gap-6">
+              {["BUY", "SELL", "BOTH"].map((opt) => (
+                <label key={opt} className="flex items-center gap-2">
                   <input
                     type="radio"
-                    name="optionType"
-                    value={t}
-                    checked={optionType === t}
-                    onChange={() => setOptionType(t)}
+                    name="action"
+                    value={opt}
+                    checked={action === opt}
+                    onChange={() => setAction(opt)}
                     className="accent-blue-600"
                   />
-                  {t}
+                  <span>{opt === "BOTH" ? "Directional (Both)" : `Only ${opt}`}</span>
                 </label>
               ))}
             </div>
-          </>
-        )}
+          </div>
 
+          {/* Expiry */}
+          <div className="mb-4 flex items-center justify-between bg-blue-50 p-3 rounded">
+            <div className="text-sm font-medium">Next Weekly Expiry</div>
+            <div className="text-lg font-bold text-blue-700">{expiry}</div>
+          </div>
 
-        {/* For BOTH: independent option type selectors for buy & sell */}
-        {action === "BOTH" && (
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block mb-2 font-semibold text-gray-700">Buy Option Type</label>
+          {/* Strike */}
+          <div className="mb-4">
+            <label className="block font-semibold mb-2">Strike Price</label>
+            <select
+              value={strike}
+              onChange={(e) => setStrike(Number(e.target.value))}
+              className="w-full border rounded p-2"
+            >
+              {strikes.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Option type for single BUY/SELL */}
+          {action !== "BOTH" && (
+            <div className="mb-4">
+              <label className="block font-semibold mb-2">Option Type</label>
               <div className="flex gap-6">
                 {["CE", "PE"].map((t) => (
-                  <label key={`buy-${t}`} className="flex items-center gap-2 text-gray-700">
+                  <label key={t} className="flex items-center gap-2">
                     <input
                       type="radio"
-                      name="buyOptionType"
+                      name="optionType"
                       value={t}
-                      checked={buyOptionType === t}
-                      onChange={() => setBuyOptionType(t)}
+                      checked={optionType === t}
+                      onChange={() => setOptionType(t)}
                       className="accent-blue-600"
                     />
-                    {t}
+                    <span>{t}</span>
                   </label>
                 ))}
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="block mb-2 font-semibold text-gray-700">Sell Option Type</label>
-              <div className="flex gap-6">
-                {["CE", "PE"].map((t) => (
-                  <label key={`sell-${t}`} className="flex items-center gap-2 text-gray-700">
+          {/* Direction selector when BOTH */}
+          {action === "BOTH" && (
+            <div className="mb-4">
+              <label className="block font-semibold mb-2">Market Direction</label>
+              <div className="flex gap-6 items-center">
+                {["BULLISH", "BEARISH"].map((d) => (
+                  <label key={d} className="flex items-center gap-2">
                     <input
                       type="radio"
-                      name="sellOptionType"
-                      value={t}
-                      checked={sellOptionType === t}
-                      onChange={() => setSellOptionType(t)}
+                      name="direction"
+                      value={d}
+                      checked={marketDirection === d}
+                      onChange={() => setMarketDirection(d)}
                       className="accent-blue-600"
                     />
-                    {t}
+                    <span>{d[0] + d.slice(1).toLowerCase()}</span>
                   </label>
                 ))}
+                <div className="text-sm text-gray-500 ml-4">
+                  Bullish → Sell PE & Buy CE
+                </div>
+                <div className="text-sm text-gray-500 ml-4">
+                  Bearish → Buy PE & Sell CE
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Price inputs based on action */}
-        {action === "BUY" && (
-          <div className="mb-6">
-            <label className="block mb-2 font-semibold text-gray-700">Buy Range (Base Price)</label>
-            <input
-              type="number"
-              className="border rounded-lg w-full py-2 px-3 focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter buy base price (e.g. 160)"
-              value={buyPrice}
-              onChange={(e) => setBuyPrice(e.target.value)}
-            />
-          </div>
-        )}
-
-        {action === "SELL" && (
-          <div className="mb-6">
-            <label className="block mb-2 font-semibold text-gray-700">Sell Range (Base Price)</label>
-            <input
-              type="number"
-              className="border rounded-lg w-full py-2 px-3 focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter sell base price (e.g. 160)"
-              value={sellPrice}
-              onChange={(e) => setSellPrice(e.target.value)}
-            />
-          </div>
-        )}
-
-        {action === "BOTH" && (
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block mb-2 font-semibold text-gray-700">Buy Base Price {buyOptionType}</label>
+          {/* Price inputs */}
+          {action === "BUY" && (
+            <div className="mb-4">
+              <label className="block font-semibold mb-2">Buy Base Price</label>
               <input
                 type="number"
-                className="border rounded-lg w-full py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter buy base price"
                 value={buyPrice}
                 onChange={(e) => setBuyPrice(e.target.value)}
+                className="w-full border rounded p-2"
+                placeholder="e.g. 160"
               />
             </div>
+          )}
 
-            <div>
-              <label className="block mb-2 font-semibold text-gray-700">Sell Base Price {sellOptionType}</label>
+          {action === "SELL" && (
+            <div className="mb-4">
+              <label className="block font-semibold mb-2">Sell Base Price</label>
               <input
                 type="number"
-                className="border rounded-lg w-full py-2 px-3 focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter sell base price"
                 value={sellPrice}
                 onChange={(e) => setSellPrice(e.target.value)}
+                className="w-full border rounded p-2"
+                placeholder="e.g. 160"
               />
+            </div>
+          )}
+
+          {action === "BOTH" && (
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block font-semibold mb-2">Buy Base Price ({buyOptionType})</label>
+                <input
+                  type="number"
+                  value={buyPrice}
+                  onChange={(e) => setBuyPrice(e.target.value)}
+                  className="w-full border rounded p-2"
+                  placeholder="e.g. 160"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-2">Sell Base Price ({sellOptionType})</label>
+                <input
+                  type="number"
+                  value={sellPrice}
+                  onChange={(e) => setSellPrice(e.target.value)}
+                  className="w-full border rounded p-2"
+                  placeholder="e.g. 160"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6">
+            <button className="w-full bg-blue-600 text-white py-2 rounded" type="submit">
+              Preview Message
+            </button>
+          </div>
+        </form>
+
+        {/* Preview / Confirm area */}
+        {confirmMode && (
+          <div className="bg-white rounded-2xl shadow p-6">
+            <h2 className="font-semibold mb-3">Preview</h2>
+            <pre className="whitespace-pre-wrap bg-gray-50 p-3 rounded">{preview}</pre>
+
+            <div className="flex gap-4 justify-center mt-4">
+              <button onClick={sendToTelegram} className="bg-green-600 text-white px-4 py-2 rounded">
+                Confirm & Send
+              </button>
+              <button onClick={() => setConfirmMode(false)} className="bg-gray-200 px-4 py-2 rounded">
+                Cancel
+              </button>
             </div>
           </div>
         )}
-
-        <button
-          type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full"
-        >
-          Preview Message
-        </button>
-      </form>
-
-      {/* Preview & Confirm */}
-      {confirmMode && (
-        <div className="bg-white shadow-xl rounded-2xl p-6 mt-6 w-full max-w-md text-center">
-          <p className="mb-4 font-semibold text-gray-700">Preview:</p>
-          <pre className="whitespace-pre-wrap text-lg text-gray-800 bg-gray-50 p-3 rounded-lg border">
-            {preview}
-          </pre>
-          <div className="flex justify-center gap-4 mt-6">
-            <button
-              onClick={sendToTelegram}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
-            >
-              Confirm & Send
-            </button>
-            <button
-              onClick={() => setConfirmMode(false)}
-              className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded-lg"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
