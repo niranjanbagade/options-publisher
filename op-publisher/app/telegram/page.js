@@ -198,6 +198,7 @@ export default function TelegramPage() {
                     {[
                         { id: "trade", label: "Fresh Trade" },
                         { id: "squareoff", label: "Square Off" },
+                        { id: "expiry", label: "Expiry Trades" },
                         { id: "loss", label: "Loss Booking" },
                         { id: "ignore", label: "Ignore Alert" },
                     ].map((tab) => (
@@ -364,6 +365,10 @@ export default function TelegramPage() {
 
                 {/* Square Off */}
                 {activeTab === "squareoff" && <SquareOffSection strikes={strikes} onSend={sendToTelegram} />}
+
+                {activeTab === "expiry" && (
+                    <ExpiryTradesSection strikes={strikes} onSend={sendToTelegram} />
+                )}
 
                 {/* Loss Booking */}
                 {activeTab === "loss" && <LossBookingSection strikes={strikes} onSend={sendToTelegram} />}
@@ -758,4 +763,178 @@ function IgnoreAlertSection({ onSend }) {
             </button>
         </div>
     )
-}  
+}
+
+// ---- Expiry Trades Section (Final - simplified per new requirement) ----
+function ExpiryTradesSection({ strikes, onSend }) {
+    const [marketView, setMarketView] = useState("BULLISH") // BULLISH or BEARISH
+    const [strike, setStrike] = useState(25900)
+    const [exitPrice, setExitPrice] = useState("")
+    const [template, setTemplate] = useState("book100")
+    const [preview, setPreview] = useState("")
+  
+    // Templates as per your pattern
+    const expiryTemplates = [
+      {
+        id: "book100",
+        label: "Book 100% Profit",
+        text: "Modify stop loss and book 100% profit.",
+      },
+      {
+        id: "book50",
+        label:
+          "Book 50% Profit (Trailing stop loss for remaining 50%)",
+        text:
+          "Modify stop loss and book 50% profit and now keep trailing stop loss at cost for remaining 50% qty.",
+      },
+      {
+        id: "trailprofit",
+        label: "Trailing Stop Loss Triggered - Book Remaining Profit",
+        text:
+          "Trailing stop loss triggered. Modify stop loss and book profit for remaining 50% quantity.",
+      },
+      {
+        id: "trailclose",
+        label: "Trailing Stop Loss Triggered - Square Off",
+        text:
+          "Trailing stop loss triggered. Modify your stop loss and square off position.",
+      },
+      {
+        id: "stoploss",
+        label: "Stop Loss Triggered - Square Off",
+        text:
+          "Stop loss triggered. Modify your stop loss and square off position.",
+      },
+    ]
+  
+    // Build message text
+    const buildMessage = () => {
+      if (!exitPrice) {
+        toast.error("Enter Exit Price")
+        return null
+      }
+  
+      const selectedTemplate = expiryTemplates.find((t) => t.id === template)
+      if (!selectedTemplate) {
+        toast.error("Select message type")
+        return null
+      }
+  
+      // Market View logic
+      const optionType = marketView === "BULLISH" ? "PE" : "CE"
+  
+      // Construct final message
+      const message = `SQUARE OFF\n${selectedTemplate.text} Buy ${strike} ${optionType} @ ${exitPrice}`
+  
+      return message
+    }
+  
+    const handlePreview = (e) => {
+      e.preventDefault()
+      const msg = buildMessage()
+      if (msg) setPreview(msg)
+    }
+  
+    return (
+      <form onSubmit={handlePreview} className="bg-white rounded-2xl shadow p-8">
+        <h1 className="text-2xl font-bold mb-6">Expiry Day Trades</h1>
+  
+        {/* Market View */}
+        <div className="mb-4">
+          <label className="block font-semibold mb-2">Market View</label>
+          <div className="flex gap-6">
+            <label>
+              <input
+                type="radio"
+                name="marketView"
+                value="BULLISH"
+                checked={marketView === "BULLISH"}
+                onChange={() => setMarketView("BULLISH")}
+                className="accent-blue-600"
+              />{" "}
+              Bullish (Buy PE)
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="marketView"
+                value="BEARISH"
+                checked={marketView === "BEARISH"}
+                onChange={() => setMarketView("BEARISH")}
+                className="accent-blue-600"
+              />{" "}
+              Bearish (Buy CE)
+            </label>
+          </div>
+        </div>
+  
+        {/* Strike Price */}
+        <div className="mb-4">
+          <label className="block font-semibold mb-2">Strike Price</label>
+          <select
+            value={strike}
+            onChange={(e) => setStrike(Number(e.target.value))}
+            className="w-full border rounded p-2"
+          >
+            {strikes.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+  
+        {/* Exit Price */}
+        <div className="mb-4">
+          <label className="block font-semibold mb-2">
+            Exit Price ({marketView === "BULLISH" ? "PE" : "CE"})
+          </label>
+          <input
+            type="number"
+            value={exitPrice}
+            onChange={(e) => setExitPrice(e.target.value)}
+            className="w-full border rounded p-2"
+            placeholder="e.g. 120"
+          />
+        </div>
+  
+        {/* Message Type */}
+        <div className="mb-4">
+          <label className="block font-semibold mb-2">Message Type</label>
+          <select
+            value={template}
+            onChange={(e) => setTemplate(e.target.value)}
+            className="w-full border rounded p-2"
+          >
+            {expiryTemplates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+  
+        {/* Preview */}
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded"
+        >
+          Preview Message
+        </button>
+  
+        {preview && (
+          <div className="mt-4">
+            <PreviewCard
+              preview={preview}
+              onConfirm={() => {
+                onSend(preview)
+                setPreview("")
+                setExitPrice("")
+              }}
+              onCancel={() => setPreview("")}
+            />
+          </div>
+        )}
+      </form>
+    )
+  }  
