@@ -496,7 +496,7 @@ function SquareOffSection({ strikes, onSend }) {
                             onChange={() => setMarketView("BULLISH")}
                             className="accent-blue-600"
                         />{" "}
-                        Bullish (Sell CE & Buy PE)
+                        Bullish (Buy CE & Sell PE)
                     </label>
                     <label>
                         <input
@@ -507,7 +507,7 @@ function SquareOffSection({ strikes, onSend }) {
                             onChange={() => setMarketView("BEARISH")}
                             className="accent-blue-600"
                         />{" "}
-                        Bearish (Sell PE & Buy CE)
+                        Bearish (Buy PE & Sell CE)
                     </label>
                 </div>
             </div>
@@ -528,28 +528,54 @@ function SquareOffSection({ strikes, onSend }) {
                 </select>
             </div>
 
-            {/* Exit Prices */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label className="block font-semibold mb-1">CE Exit Price</label>
-                    <input
-                        type="number"
-                        value={exitCE}
-                        onChange={(e) => setExitCE(e.target.value)}
-                        placeholder="e.g. 120"
-                        className="w-full border rounded p-2"
-                    />
-                </div>
-                <div>
-                    <label className="block font-semibold mb-1">PE Exit Price</label>
-                    <input
-                        type="number"
-                        value={exitPE}
-                        onChange={(e) => setExitPE(e.target.value)}
-                        placeholder="e.g. 125"
-                        className="w-full border rounded p-2"
-                    />
-                </div>
+                {marketView === "BULLISH" ? (
+                    <>
+                        <div>
+                            <label className="block font-semibold mb-1">CE Exit Price</label>
+                            <input
+                                type="number"
+                                value={exitCE}
+                                onChange={(e) => setExitCE(e.target.value)}
+                                placeholder="e.g. 120"
+                                className="w-full border rounded p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">PE Exit Price</label>
+                            <input
+                                type="number"
+                                value={exitPE}
+                                onChange={(e) => setExitPE(e.target.value)}
+                                placeholder="e.g. 125"
+                                className="w-full border rounded p-2"
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div>
+                            <label className="block font-semibold mb-1">PE Exit Price</label>
+                            <input
+                                type="number"
+                                value={exitPE}
+                                onChange={(e) => setExitPE(e.target.value)}
+                                placeholder="e.g. 125"
+                                className="w-full border rounded p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block font-semibold mb-1">CE Exit Price</label>
+                            <input
+                                type="number"
+                                value={exitCE}
+                                onChange={(e) => setExitCE(e.target.value)}
+                                placeholder="e.g. 120"
+                                className="w-full border rounded p-2"
+                            />
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Action Dropdown */}
@@ -592,113 +618,6 @@ function SquareOffSection({ strikes, onSend }) {
                         onCancel={() => setPreview("")}
                     />
                 </div>
-            )}
-        </form>
-    )
-}
-
-
-function LossBookingSection({ onSend, strikes }) {
-    const [strike, setStrike] = useState(25600)
-    const [side, setSide] = useState("BOTH") // NEW: CE | PE | BOTH
-    const [cePrice, setCePrice] = useState("")
-    const [pePrice, setPePrice] = useState("")
-    const [preview, setPreview] = useState("")
-
-    useEffect(() => {
-        const resetHandler = () => {
-            setStrike(25600)
-            setSide("BOTH")
-            setCePrice("")
-            setPePrice("")
-            setPreview("")
-        }
-
-        document.addEventListener("reset-forms", resetHandler)
-        return () => document.removeEventListener("reset-forms", resetHandler)
-    }, [])
-
-
-    const buildMessage = () => {
-        if (side === "CE" && !cePrice) return toast.error("Enter CE price")
-        if (side === "PE" && !pePrice) return toast.error("Enter PE price")
-        if (side === "BOTH" && (!cePrice || !pePrice))
-            return toast.error("Enter both CE & PE prices")
-
-        let msg = "SQUARE OFF\nStop loss triggered. Modify your stop loss and square off position. "
-
-        if (side === "CE")
-            msg += `Sell ${strike} CE @ ${cePrice}`
-        else if (side === "PE")
-            msg += `Buy ${strike} PE @ ${pePrice}`
-        else
-            msg += `Sell ${strike} CE @ ${cePrice} and Buy ${strike} PE @ ${pePrice}`
-
-        return msg
-    }
-
-    const handlePreview = (e) => {
-        e.preventDefault()
-        const msg = buildMessage()
-        if (msg) setPreview(msg)
-    }
-
-    return (
-        <form onSubmit={handlePreview} className="bg-white rounded-2xl shadow p-8">
-            <h1 className="text-2xl font-bold mb-6">Loss Booking</h1>
-
-            {/* CE/PE/Both selector */}
-            <div className="mb-4">
-                <label className="block font-semibold mb-2">Option Side</label>
-                <div className="flex gap-6">
-                    {["CE", "PE", "BOTH"].map((t) => (
-                        <label key={t}>
-                            <input
-                                type="radio"
-                                checked={side === t}
-                                onChange={() => setSide(t)}
-                                className="accent-blue-600"
-                            />{" "}
-                            {t === "BOTH" ? "Both CE & PE" : `Only ${t}`}
-                        </label>
-                    ))}
-                </div>
-            </div>
-
-            {/* Strike dropdown */}
-            <div className="mb-4">
-                <label className="block font-semibold mb-2">Strike Price</label>
-                <select
-                    value={strike}
-                    onChange={(e) => setStrike(Number(e.target.value))}
-                    className="w-full border rounded p-2"
-                >
-                    {strikes.map((s) => (
-                        <option key={s} value={s}>
-                            {s}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {/* Dynamic inputs */}
-            {(side === "CE" || side === "BOTH") && (
-                <Input label="CE Price" value={cePrice} setValue={setCePrice} />
-            )}
-            {(side === "PE" || side === "BOTH") && (
-                <Input label="PE Price" value={pePrice} setValue={setPePrice} />
-            )}
-
-            <button className="w-full bg-blue-600 text-white py-2 rounded" type="submit">
-                Preview Message
-            </button>
-
-            {preview && (
-                <PreviewCard
-                    preview={preview}
-                    onConfirm={() => onSend(preview)}
-                    onCancel={() => setPreview("")}
-                />
             )}
         </form>
     )
