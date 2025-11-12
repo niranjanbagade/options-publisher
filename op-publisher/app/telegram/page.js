@@ -16,9 +16,7 @@ export default function TelegramPage() {
     const { data: session, status } = useSession()
     const [authorized, setAuthorized] = useState(false)
     const [activeTab, setActiveTab] = useState("trade")
-
-    const strikes = Array.from({ length: (50000 - 24000) / 50 + 1 }, (_, i) => 24000 + i * 50)
-
+    
     useEffect(() => {
         if (!session?.user?.email) return setAuthorized(false)
         const whitelist = (process.env.NEXT_PUBLIC_AUTHORIZED_USERS || "")
@@ -27,6 +25,34 @@ export default function TelegramPage() {
             .filter(Boolean)
         setAuthorized(whitelist.includes(session.user.email))
     }, [session])
+
+    const [strikes, setStrikes] = useState([]);
+    const [baseStrike, setBaseStrike] = useState(24000);
+    
+    useEffect(() => {
+        async function fetchPreOpenData() {
+            try {
+                const res = await fetch("/api/nifty-preopen");
+                const data = await res.json();
+                const lastPrice = parseFloat(data?.niftyPreopenStatus?.lastPrice);
+    
+                if (!isNaN(lastPrice)) {
+                    const rounded = Math.round(lastPrice / 50) * 50;
+                    setBaseStrike(rounded);
+                    const dynamicStrikes = Array.from({ length: 21 }, (_, i) => rounded - 500 + i * 50);
+                    setStrikes(dynamicStrikes);
+                } else {
+                    console.warn("Invalid lastPrice — using default 24000");
+                    setStrikes(Array.from({ length: 21 }, (_, i) => 24000 - 500 + i * 50));
+                }
+            } catch (err) {
+                console.error("Error fetching pre-open data:", err);
+                setStrikes(Array.from({ length: 21 }, (_, i) => 24000 - 500 + i * 50));
+            }
+        }
+    
+        fetchPreOpenData(); // Run once on page load
+    }, []);    
 
     // ---- Reset listener for all sub-forms ----
     useEffect(() => {
