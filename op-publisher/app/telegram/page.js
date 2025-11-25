@@ -184,14 +184,31 @@ function FreshTradeSection({ strikes, onSend }) {
     const [sellStopLoss, setSellStopLoss] = useState("")
 
     useEffect(() => {
-        const today = new Date()
-        const nextTuesday = new Date(today)
-        const day = today.getDay()
-        const daysUntilTue = (2 - day + 7) % 7 || 7
-        nextTuesday.setDate(today.getDate() + daysUntilTue)
-        const formatted = nextTuesday.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
-        setExpiry(formatted.replace(".", ""))
-    }, [])
+        const today = new Date();
+        const day = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 2 = Tuesday
+        let daysUntilTue;
+    
+        // Check if today is Tuesday (day === 2)
+        if (day === 2) {
+            // If today is Tuesday, the expiry is today
+            daysUntilTue = 0;
+        } else {
+            // If not Tuesday, calculate days until the *next* Tuesday
+            // (2 - day + 7) % 7 ensures a non-negative value
+            // The || 7 part is no longer strictly necessary because if day=2, daysUntilTue is explicitly set to 0.
+            // For any other day, (2 - day + 7) % 7 will be between 1 and 6.
+            daysUntilTue = (2 - day + 7) % 7;
+        }
+    
+        const nextTuesday = new Date(today);
+        nextTuesday.setDate(today.getDate() + daysUntilTue);
+    
+        // Format the date
+        const formatted = nextTuesday.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+        
+        // Set the state, removing the trailing period if present (e.g., from "Jan.")
+        setExpiry(formatted.replace(".", ""));
+    }, []);
 
     useEffect(() => {
         if (action === "BOTH") {
