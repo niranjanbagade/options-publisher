@@ -27,7 +27,7 @@ export default function TelegramPage() {
     }, [session])
 
     const [strikes, setStrikes] = useState([]);
-    const [baseStrike, setBaseStrike] = useState(24000);
+    const [baseStrike, setBaseStrike] = useState(0);
     
     useEffect(() => {
         async function fetchPreOpenData() {
@@ -172,7 +172,7 @@ function FreshTradeSection({ strikes, onSend }) {
     const [confirmMode, setConfirmMode] = useState(false)
     const [preview, setPreview] = useState("")
     const [action, setAction] = useState("BUY") // BUY | SELL | BOTH
-    const [strike, setStrike] = useState(24000)
+    const [strike, setStrike] = useState(0)
     const [optionType, setOptionType] = useState("CE")
     const [marketDirection, setMarketDirection] = useState("BULLISH")
     const [buyOptionType, setBuyOptionType] = useState("CE")
@@ -225,7 +225,7 @@ function FreshTradeSection({ strikes, onSend }) {
     useEffect(() => {
         const resetHandler = () => {
             setAction("BUY")
-            setStrike(24000)
+            setStrike(0)
             setOptionType("CE")
             setMarketDirection("BULLISH")
             setBuyOptionType("CE")
