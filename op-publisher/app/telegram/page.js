@@ -16,7 +16,7 @@ export default function TelegramPage() {
     const { data: session, status } = useSession()
     const [authorized, setAuthorized] = useState(false)
     const [activeTab, setActiveTab] = useState("trade")
-    
+
     useEffect(() => {
         if (!session?.user?.email) return setAuthorized(false)
         const whitelist = (process.env.NEXT_PUBLIC_AUTHORIZED_USERS || "")
@@ -28,14 +28,14 @@ export default function TelegramPage() {
 
     const [strikes, setStrikes] = useState([]);
     const [baseStrike, setBaseStrike] = useState(0);
-    
+
     useEffect(() => {
         async function fetchPreOpenData() {
             try {
                 const res = await fetch("/api/nifty-preopen");
                 const data = await res.json();
                 const lastPrice = parseFloat(data?.niftyPreopenStatus?.lastPrice);
-    
+
                 if (!isNaN(lastPrice)) {
                     const rounded = Math.round(lastPrice / 50) * 50;
                     setBaseStrike(rounded);
@@ -50,9 +50,9 @@ export default function TelegramPage() {
                 setStrikes(Array.from({ length: 21 }, (_, i) => 24000 - 500 + i * 50));
             }
         }
-    
+
         fetchPreOpenData(); // Run once on page load
-    }, []);    
+    }, []);
 
     // ---- Reset listener for all sub-forms ----
     useEffect(() => {
@@ -187,25 +187,42 @@ function FreshTradeSection({ strikes, onSend }) {
         const today = new Date();
         const day = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 2 = Tuesday
         let daysUntilTue;
-    
+
         // Check if today is Tuesday (day === 2)
         if (day === 2) {
             // If today is Tuesday, the expiry is today
             daysUntilTue = 0;
         } else {
             // If not Tuesday, calculate days until the *next* Tuesday
-            // (2 - day + 7) % 7 ensures a non-negative value
-            // The || 7 part is no longer strictly necessary because if day=2, daysUntilTue is explicitly set to 0.
-            // For any other day, (2 - day + 7) % 7 will be between 1 and 6.
             daysUntilTue = (2 - day + 7) % 7;
         }
-    
+
         const nextTuesday = new Date(today);
         nextTuesday.setDate(today.getDate() + daysUntilTue);
-    
+
+        // Check for holiday
+        const holidays = [
+            "2026-03-03", // Holi
+            "2026-03-31", // Shri Mahavir Jayanti
+            "2026-04-14", // Dr. Ambedkar Jayanti
+            "2026-05-26", // Bakri Id
+            "2026-10-20", // Dussehra
+            "2026-11-10", // Diwali
+            "2026-11-24", // Guru Nanak Jayanti
+        ];
+
+        const year = nextTuesday.getFullYear();
+        const month = String(nextTuesday.getMonth() + 1).padStart(2, '0');
+        const date = String(nextTuesday.getDate()).padStart(2, '0');
+        const dateString = `${year}-${month}-${date}`;
+
+        if (holidays.includes(dateString)) {
+            nextTuesday.setDate(nextTuesday.getDate() - 1);
+        }
+
         // Format the date
         const formatted = nextTuesday.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-        
+
         // Set the state, removing the trailing period if present (e.g., from "Jan.")
         setExpiry(formatted.replace(".", ""));
     }, []);
