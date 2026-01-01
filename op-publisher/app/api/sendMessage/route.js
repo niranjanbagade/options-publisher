@@ -39,7 +39,7 @@ export async function POST(req) {
           'Authorization': `Basic ${auth}`, // Standard Basic Auth header
           'ngrok-skip-browser-warning': 'true' // Recommended to avoid ngrok landing page
         },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message: message, sentAt: Date.now() })
       })
 
       console.log("External API response status:", externalRes.status)
