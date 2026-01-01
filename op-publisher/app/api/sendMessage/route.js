@@ -1,30 +1,27 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "../auth/[...nextauth]/route"
 
+// 1. INCREASE TIMEOUT FOR COLD STARTS
+export const maxDuration = 60; 
+
 export async function POST(req) {
   try {
-    // Get logged-in user session
     const session = await getServerSession(authOptions)
 
     if (!session || !session.user?.email) {
-      return Response.json({ error: "Unauthorized - not logged in" }, { status: 401 })
+      return Response.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Read authorized emails from env
     const authorized = process.env.AUTHORIZED_USERS?.split(",").map((e) => e.trim()) || []
-
-    // Check if user email is whitelisted
     if (!authorized.includes(session.user.email)) {
       return Response.json({ error: "Access denied" }, { status: 403 })
     }
 
-    // Continue if authorized
     const { message } = await req.json()
     if (!message) {
       return Response.json({ error: "Message cannot be empty" }, { status: 400 })
     }
 
-    // Send to external API (fire and forget or await but don't block success)
     try {
       const username = process.env.NGROK_USER_ID
       const password = process.env.NGROK_USER_SECRET
@@ -56,16 +53,24 @@ export async function POST(req) {
             text: message,
           }),
         })
+
         const data = await res.json()
-        if (!res.ok) throw new Error(data.description || "Failed to send message")
+        if (!res.ok) {
+          return Response.json({ 
+            error: "Automation worked, but Telegram failed: " + (data.description || "Unknown Error")
+          }, { status: 500 })
+        }
+
+        return Response.json({ success: true })
+      } else {
+        return Response.json({ 
+          error: `Automation failed (Status ${externalRes.status}). Telegram message skipped to avoid confusion.` 
+        }, { status: 500 })
       }
     } catch (externalErr) {
-      console.error("Failed to send to external API:", externalErr)
+      return Response.json({ error: "Could not reach automation server via proxy: " + externalErr.message }, { status: 500 })
     }
-
-    return Response.json({ success: true })
   } catch (error) {
-    console.error("Error sending message:", error)
     return Response.json({ error: error.message }, { status: 500 })
   }
 }
