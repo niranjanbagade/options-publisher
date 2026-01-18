@@ -501,6 +501,7 @@ function SquareOffSection({ strikes, onSend }) {
         trailprofit: "Trailing stop loss triggered. Modify stop loss and book profit for remaining 50% quantity.",
         trailclose: "Trailing stop loss triggered. Square off position.",
         stoploss: "Stop loss triggered. Modify your stop loss and square off position.",
+        tsl: "Modify stop loss and book 100% profit or trail for maximum profit.",
     }
 
     useEffect(() => {
@@ -538,7 +539,7 @@ function SquareOffSection({ strikes, onSend }) {
                 toast.error("Enter exit price.")
                 return null
             }
-            msg = `SQUARE OFF\n${actionText} Sell ${strike} ${selectedOption} @ ${singleExit}`
+            msg = `SQUARE OFF ${action === "tsl" ? "TSL" : ""}\n${actionText} Sell ${strike} ${selectedOption} @ ${singleExit}`
         }
 
         // Exit from Sell (Buy to close)
@@ -551,7 +552,7 @@ function SquareOffSection({ strikes, onSend }) {
                 toast.error("Enter exit price.")
                 return null
             }
-            msg = `SQUARE OFF\n${actionText} Buy ${strike} ${selectedOption} @ ${singleExit}`
+            msg = `SQUARE OFF ${action === "tsl" ? "TSL" : ""}\n${actionText} Buy ${strike} ${selectedOption} @ ${singleExit}`
         }
 
         // Exit from Both
@@ -563,10 +564,10 @@ function SquareOffSection({ strikes, onSend }) {
 
             if (marketView === "BULLISH") {
                 // Bullish = originally Buy CE, Sell PE → to close: Sell CE, Buy PE
-                msg = `SQUARE OFF\n${actionText} Sell ${strike} CE @ ${ceExit} and Buy ${strike} PE @ ${peExit}`
+                msg = `SQUARE OFF ${action === "tsl" ? "TSL" : ""}\n${actionText} Sell ${strike} CE @ ${ceExit} and Buy ${strike} PE @ ${peExit}`
             } else {
                 // Bearish = originally Buy PE, Sell CE → to close: Sell PE, Buy CE
-                msg = `SQUARE OFF\n${actionText} Sell ${strike} PE @ ${peExit} and Buy ${strike} CE @ ${ceExit}`
+                msg = `SQUARE OFF ${action === "tsl" ? "TSL" : ""}\n${actionText} Sell ${strike} PE @ ${peExit} and Buy ${strike} CE @ ${ceExit}`
             }
         }
 
@@ -764,6 +765,7 @@ function SquareOffSection({ strikes, onSend }) {
                             Trailing SL triggered – square off position
                         </option>
                         <option value="stoploss">Stop loss triggered</option>
+                        <option value="tsl">Modify stop loss and book 100% profit or trail for maximum profit.</option>
                     </select>
                 </div>
             )}
@@ -872,6 +874,11 @@ function ExpiryTradesSection({ strikes, onSend }) {
             text:
                 "Stop loss triggered. Modify your stop loss and square off position.",
         },
+        {
+            id: "tsl",
+            label: "Trail for profit",
+            text: "Modify stop loss and book 100% profit or trail for maximum profit.",
+        }
     ]
 
     const buildMessage = () => {
@@ -890,7 +897,7 @@ function ExpiryTradesSection({ strikes, onSend }) {
         const optionType = marketView === "BULLISH" ? "PE" : "CE"
 
         // Construct final message
-        const message = `SQUARE OFF\n${selectedTemplate.text} Buy ${strike} ${optionType} @ ${exitPrice}`
+        const message = `SQUARE OFF ${selectedTemplate.id === "tsl" ? "TSL" : ""}\n${selectedTemplate.text} Buy ${strike} ${optionType} @ ${exitPrice}`
 
         return message
     }
