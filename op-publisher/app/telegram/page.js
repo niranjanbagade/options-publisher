@@ -39,15 +39,15 @@ export default function TelegramPage() {
                 if (!isNaN(lastPrice)) {
                     const rounded = Math.round(lastPrice / 50) * 50;
                     setBaseStrike(rounded);
-                    const dynamicStrikes = Array.from({ length: 21 }, (_, i) => rounded - 500 + i * 50);
+                    const dynamicStrikes = Array.from({ length: 71 }, (_, i) => rounded - 2500 + i * 50);
                     setStrikes(dynamicStrikes);
                 } else {
                     console.warn("Invalid lastPrice — using default 24000");
-                    setStrikes(Array.from({ length: 21 }, (_, i) => 24000 - 500 + i * 50));
+                    setStrikes(Array.from({ length: 71 }, (_, i) => 24000 - 2500 + i * 50));
                 }
             } catch (err) {
                 console.error("Error fetching pre-open data:", err);
-                setStrikes(Array.from({ length: 21 }, (_, i) => 24000 - 500 + i * 50));
+                setStrikes(Array.from({ length: 71 }, (_, i) => 24000 - 2500 + i * 50));
             }
         }
 
