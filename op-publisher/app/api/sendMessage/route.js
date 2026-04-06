@@ -23,25 +23,27 @@ export async function POST(req) {
     }
 
     try {
+      var sendToNgrok = false;
       const username = process.env.NGROK_USER_ID
       const password = process.env.NGROK_USER_SECRET
       const ngrokUrl = process.env.NGROK_URL
       const auth = Buffer.from(`${username}:${password}`).toString('base64')
+      var externalRes = null;
+      if(sendToNgrok){
+        externalRes = await fetch(ngrokUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Vercel-Token': process.env.X_VERCEL_TOKEN,
+            'Authorization': `Basic ${auth}`, // Standard Basic Auth header
+            'ngrok-skip-browser-warning': 'true' // Recommended to avoid ngrok landing page
+          },
+          body: JSON.stringify({ message: message, sentAt: Date.now() })
+        })
+        console.log("External API response status:", externalRes.status)
+      }
 
-      const externalRes = await fetch(ngrokUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Vercel-Token': process.env.X_VERCEL_TOKEN,
-          'Authorization': `Basic ${auth}`, // Standard Basic Auth header
-          'ngrok-skip-browser-warning': 'true' // Recommended to avoid ngrok landing page
-        },
-        body: JSON.stringify({ message: message, sentAt: Date.now() })
-      })
-
-      console.log("External API response status:", externalRes.status)
-
-      if (externalRes.ok) {
+      if (!sendToNgrok || externalRes.ok) {
         const botToken = process.env.TELEGRAM_BOT_TOKEN
         const chatId = process.env.TELEGRAM_CHAT_ID
         const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
